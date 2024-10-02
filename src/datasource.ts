@@ -26,7 +26,6 @@ class BigQueryIntegration implements IntegrationBase {
     const serviceAccount = JSON.parse(
       Buffer.from(this.base64EncodedServiceAccount, "base64").toString().replace(/\n/g,"")
     )
-    console.log('serviceAccount', serviceAccount)
     const auth = new GoogleAuth({
       credentials: serviceAccount,
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
