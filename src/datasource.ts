@@ -1,5 +1,5 @@
 import { IntegrationBase } from "@budibase/types";
-
+import { GoogleAuth } from 'google-auth-library';
 import { BigQuery } from '@google-cloud/bigquery';
 
 interface Query {
@@ -7,37 +7,39 @@ interface Query {
 }
 
 class BigQueryIntegration implements IntegrationBase {
-  // private readonly credentialsFilePath: string
-  private readonly clientEmail: string;
-  private readonly privateKey: string;
+  private readonly base64EncodedServiceAccount: string;
   private readonly gcpProjectId: string;
-  private readonly bqDatasetId: string;
-  private readonly bqDatasetLocation: string;
+  private authClient: GoogleAuth;
 
   constructor(config: { 
-      clientEmail: string,
-      privateKey: string, 
+      base64EncodedServiceAccount: string,
       gcpProjectId: string,
-      bqDatasetId: string,
-      bqDatasetLocation: string
     }
     ) {
-    this.clientEmail = config.clientEmail;
-    this.privateKey = config.privateKey;
-
+    this.base64EncodedServiceAccount = config.base64EncodedServiceAccount;
     this.gcpProjectId = config.gcpProjectId;
-    this.bqDatasetId = config.bqDatasetId;
-    this.bqDatasetLocation = config.bqDatasetLocation;
   }
 
+  private async getAuthClient() {
+    if (this.authClient) return this.authClient;
+    // https://github.com/orgs/vercel/discussions/219#discussioncomment-128702
+    const serviceAccount = JSON.parse(
+      Buffer.from(this.base64EncodedServiceAccount, "base64").toString().replace(/\n/g,"")
+    )
+    console.log('serviceAccount', serviceAccount)
+    const auth = new GoogleAuth({
+      credentials: serviceAccount,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+  
+    this.authClient = await auth.getClient();
+    return this.authClient;
+  }
   async getClient() {
+    const authClient = await this.getAuthClient();
     const bigqueryClient = new BigQuery({
       projectId: this.gcpProjectId,
-      credentials: {
-        type: "service_account",
-        private_key: this.privateKey?.replace(/\\n/g, "\n"),
-        client_email: this.clientEmail,
-      }
+      authClient,
     });
 
     return bigqueryClient;
@@ -47,7 +49,7 @@ class BigQueryIntegration implements IntegrationBase {
     const bigqueryClient = await this.getClient();
     const options = {
       query: query.sql,
-      location: this.bqDatasetLocation,
+      // location: this.bqDatasetLocation,
     };
     
     let [job] = await bigqueryClient.createQueryJob(options);
@@ -60,7 +62,7 @@ class BigQueryIntegration implements IntegrationBase {
     const bigqueryClient = await this.getClient();
     const options = {
       query: query.sql,
-      location: this.bqDatasetLocation,
+      // location: this.bqDatasetLocation,
     };
     
     let [job] = await bigqueryClient.createQueryJob(options);
